@@ -2,53 +2,58 @@ package dotenv
 
 import "sort"
 
-// DiffKind categorises a single entry in a diff result.
-type DiffKind string
+// DiffStatus represents the kind of change for a key.
+type DiffStatus string
 
 const (
-	Added    DiffKind = "added"    // key present in b but not in a
-	Removed  DiffKind = "removed"  // key present in a but not in b
-	Changed  DiffKind = "changed"  // key present in both but values differ
-	Unchanged DiffKind = "unchanged" // key present in both with same value
+	StatusAdded     DiffStatus = "added"
+	StatusRemoved   DiffStatus = "removed"
+	StatusChanged   DiffStatus = "changed"
+	StatusUnchanged DiffStatus = "unchanged"
 )
 
-// DiffEntry represents a single key comparison result.
+// DiffEntry holds the comparison result for a single key.
 type DiffEntry struct {
-	Key      string
-	Kind     DiffKind
-	ValueA   string // value in the "left" / source map
-	ValueB   string // value in the "right" / target map
+	Key    string
+	Status DiffStatus
+	ValueA string // value in the first (left) set
+	ValueB string // value in the second (right) set
 }
 
-// Diff compares two EnvMaps and returns a sorted slice of DiffEntry.
-// All keys from both maps are represented in the output.
-func Diff(a, b EnvMap) []DiffEntry {
+// Diff compares two env maps and returns a sorted slice of DiffEntry.
+func Diff(a, b map[string]string) []DiffEntry {
 	keys := unionKeys(a, b)
 	sort.Strings(keys)
 
-	result := make([]DiffEntry, 0, len(keys))
+	entries := make([]DiffEntry, 0, len(keys))
 	for _, k := range keys {
 		va, inA := a[k]
 		vb, inB := b[k]
 
-		var kind DiffKind
+		var status DiffStatus
 		switch {
 		case inA && !inB:
-			kind = Removed
+			status = StatusRemoved
 		case !inA && inB:
-			kind = Added
-		case va == vb:
-			kind = Unchanged
+			status = StatusAdded
+		case va != vb:
+			status = StatusChanged
 		default:
-			kind = Changed
+			status = StatusUnchanged
 		}
 
-		result = append(result, DiffEntry{Key: k, Kind: kind, ValueA: va, ValueB: vb})
+		entries = append(entries, DiffEntry{
+			Key:    k,
+			Status: status,
+			ValueA: va,
+			ValueB: vb,
+		})
 	}
-	return result
+	return entries
 }
 
-func unionKeys(a, b EnvMap) []string {
+// unionKeys returns the deduplicated union of keys from both maps.
+func unionKeys(a, b map[string]string) []string {
 	seen := make(map[string]struct{}, len(a)+len(b))
 	for k := range a {
 		seen[k] = struct{}{}
