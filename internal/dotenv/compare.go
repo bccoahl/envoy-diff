@@ -1,40 +1,45 @@
 package dotenv
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+)
 
-// CompareOptions controls how two Sources are compared and reported.
+// CompareOptions holds configuration for a full diff + format pipeline run.
 type CompareOptions struct {
 	FilterOptions FilterOptions
-	Format        string // "text", "table", "json"
+	MaskOptions   MaskOptions
+	Format        string
+	SortOrder     SortOrder
 }
 
-// Formatter is the common interface for all output formatters.
-type Formatter interface {
-	Format(entries []DiffEntry) (string, error)
-}
-
-// Compare diffs two Sources and returns formatted output.
-func Compare(a, b *Source, opts CompareOptions) (string, error) {
-	entries := Diff(a.Vars, b.Vars, a.Name, b.Name)
-	entries = Filter(entries, opts.FilterOptions)
-
-	f, err := resolveFormatter(opts.Format)
-	if err != nil {
-		return "", err
-	}
-	return f.Format(entries)
-}
-
-// resolveFormatter returns the Formatter for the given format name.
+// resolveFormatter returns the Formatter matching the requested format string.
 func resolveFormatter(format string) (Formatter, error) {
 	switch format {
-	case "", "text":
-		return TextFormatter{}, nil
+	case "text", "":
+		return &TextFormatter{}, nil
 	case "table":
-		return TableFormatter{}, nil
+		return &TableFormatter{}, nil
 	case "json":
-		return JSONFormatter{}, nil
+		return &JSONFormatter{}, nil
 	default:
-		return nil, fmt.Errorf("unknown format %q: choose text, table, or json", format)
+		return nil, fmt.Errorf("unknown format %q: must be one of text, table, json", format)
 	}
+}
+
+// Compare diffs two env maps, applies filtering, masking, sorting, and writes
+// the formatted result to w.
+func Compare(a, b map[string]string, opts CompareOptions, w io.Writer) error {
+	entries := Diff(a, b)
+
+	entries = Filter(entries, opts.FilterOptions)
+	entries = Mask(entries, opts.MaskOptions)
+	entries = SortEntries(entries, opts.SortOrder)
+
+	fmt, err := resolveFormatter(opts.Format)
+	if err != nil {
+		return err
+	}
+
+	return fmt.Format(w, entries)
 }
