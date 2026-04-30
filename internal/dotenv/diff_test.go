@@ -58,6 +58,14 @@ func TestDiff_Unchanged(t *testing.T) {
 	assert.Equal(t, dotenv.Unchanged, entries[0].Kind)
 }
 
+func TestDiff_Empty(t *testing.T) {
+	a := dotenv.EnvMap{}
+	b := dotenv.EnvMap{}
+
+	entries := dotenv.Diff(a, b)
+	assert.Empty(t, entries)
+}
+
 func TestDiff_Mixed(t *testing.T) {
 	a := dotenv.EnvMap{"KEEP": "v1", "REMOVE": "gone", "CHANGE": "old"}
 	b := dotenv.EnvMap{"KEEP": "v1", "ADD": "new", "CHANGE": "new"}
